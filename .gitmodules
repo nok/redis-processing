@@ -1,0 +1,3 @@
+[submodule "jedis"]
+	path = jedis
+	url = https://github.com/xetorthio/jedis.git
