@@ -9,7 +9,7 @@ Wrapper to use [Redis](http://redis.io/) in [Processing](http://processing.org/)
 
 ## Download
 
-* [Redis v1.0](https://raw.github.com/voidplus/redis-processing/master/download/Redis.zip) (Redis v2.6.14)
+* [Redis-Wrapper v1.1](https://raw.github.com/voidplus/redis-processing/master/download/Redis.zip) (Jedis 2.4.0 with Redis v2.8.5 support)
 
 
 ## Installation
@@ -23,9 +23,9 @@ Unzip and put the extracted *Redis* folder into the libraries folder of your Pro
 You can follow the official installation steps [here](http://redis.io/download):
 
 ```
-$ wget http://download.redis.io/releases/redis-2.8.0.tar.gz
-$ tar xzf redis-2.8.0.tar.gz
-$ cd redis-2.8.0
+$ wget http://download.redis.io/releases/redis-2.8.6.tar.gz
+$ tar xzf redis-2.8.6.tar.gz
+$ cd redis-2.8.6
 $ make
 ```
 
@@ -77,6 +77,7 @@ System:
 
 Processing Version:
 
+* 2.1.1
 * 2.1.0
 
 
