@@ -1,1 +1,1 @@
-cp -r ./jedis/src/main/java/redis ./src/redis
+cp -rf ./jedis/src/main/java/redis ./src/redis
