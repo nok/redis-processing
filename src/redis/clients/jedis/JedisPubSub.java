@@ -18,18 +18,17 @@ public abstract class JedisPubSub {
     private int subscribedChannels = 0;
     private volatile Client client;
 
-    public abstract void onMessage(String channel, String message);
+	public void onMessage(String channel, String message) {}
 
-    public abstract void onPMessage(String pattern, String channel,
-	    String message);
+	public void onPMessage(String pattern, String channel, String message) {}
 
-    public abstract void onSubscribe(String channel, int subscribedChannels);
+	public void onSubscribe(String channel, int subscribedChannels) {}
 
-    public abstract void onUnsubscribe(String channel, int subscribedChannels);
+	public void onUnsubscribe(String channel, int subscribedChannels) {}
 
-    public abstract void onPUnsubscribe(String pattern, int subscribedChannels);
+	public void onPUnsubscribe(String pattern, int subscribedChannels) {}
 
-    public abstract void onPSubscribe(String pattern, int subscribedChannels);
+	public void onPSubscribe(String pattern, int subscribedChannels) {}
 
     public void unsubscribe() {
 	if (client == null) {
@@ -162,12 +161,6 @@ public abstract class JedisPubSub {
 
 	/* Invalidate instance since this thread is no longer listening */
 	this.client = null;
-
-	/*
-	 * Reset pipeline count because subscribe() calls would have increased
-	 * it but nothing decremented it.
-	 */
-	client.resetPipelinedCount();
     }
 
     public int getSubscribedChannels() {

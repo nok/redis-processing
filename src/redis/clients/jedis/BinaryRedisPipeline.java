@@ -34,7 +34,7 @@ public interface BinaryRedisPipeline {
 
     Response<byte[]> getSet(byte[] key, byte[] value);
 
-    Response<Long> getrange(byte[] key, long startOffset, long endOffset);
+    Response<byte[]> getrange(byte[] key, long startOffset, long endOffset);
 
     Response<Long> hdel(byte[] key, byte[]... field);
 
@@ -207,7 +207,29 @@ public interface BinaryRedisPipeline {
 
     Response<Double> zscore(byte[] key, byte[] member);
 
+    Response<Long> zlexcount(final byte[] key, final byte[] min,
+	    final byte[] max);
+
+    Response<Set<byte[]>> zrangeByLex(final byte[] key, final byte[] min,
+	    final byte[] max);
+
+    Response<Set<byte[]>> zrangeByLex(final byte[] key, final byte[] min,
+	    final byte[] max, int offset, int count);
+
+    Response<Set<byte[]>> zrevrangeByLex(final byte[] key, final byte[] max,
+	    final byte[] min);
+
+    Response<Set<byte[]>> zrevrangeByLex(final byte[] key, final byte[] max,
+	    final byte[] min, int offset, int count);
+
+    Response<Long> zremrangeByLex(final byte[] key, final byte[] min,
+	    final byte[] max);
+
     Response<Long> bitcount(byte[] key);
 
     Response<Long> bitcount(byte[] key, long start, long end);
+
+    Response<Long> pfadd(final byte[] key, final byte[]... elements);
+
+    Response<Long> pfcount(final byte[] key);
 }

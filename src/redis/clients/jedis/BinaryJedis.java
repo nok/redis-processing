@@ -4,6 +4,7 @@ import static redis.clients.jedis.Protocol.toByteArray;
 
 import java.io.Closeable;
 import java.net.URI;
+import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -16,21 +17,24 @@ import redis.clients.jedis.BinaryClient.LIST_POSITION;
 import redis.clients.jedis.exceptions.JedisDataException;
 import redis.clients.jedis.exceptions.JedisException;
 import redis.clients.util.JedisByteHashMap;
+import redis.clients.util.JedisURIHelper;
 import redis.clients.util.SafeEncoder;
 
 public class BinaryJedis implements BasicCommands, BinaryJedisCommands,
 	MultiKeyBinaryCommands, AdvancedBinaryJedisCommands,
 	BinaryScriptingCommands, Closeable {
     protected Client client = null;
+    protected Transaction transaction = null;
+    protected Pipeline pipeline = null;
+
+    public BinaryJedis() {
+	client = new Client();
+    }
 
     public BinaryJedis(final String host) {
 	URI uri = URI.create(host);
 	if (uri.getScheme() != null && uri.getScheme().equals("redis")) {
-	    client = new Client(uri.getHost(), uri.getPort());
-	    client.auth(uri.getUserInfo().split(":", 2)[1]);
-	    client.getStatusCodeReply();
-	    client.select(Integer.parseInt(uri.getPath().split("/", 2)[1]));
-	    client.getStatusCodeReply();
+	    initializeClientFromURI(uri);
 	} else {
 	    client = new Client(host);
 	}
@@ -52,11 +56,28 @@ public class BinaryJedis implements BasicCommands, BinaryJedisCommands,
     }
 
     public BinaryJedis(URI uri) {
+	initializeClientFromURI(uri);
+    }
+
+    public BinaryJedis(final URI uri, final int timeout) {
+	initializeClientFromURI(uri);
+	client.setTimeout(timeout);
+    }
+
+    private void initializeClientFromURI(URI uri) {
 	client = new Client(uri.getHost(), uri.getPort());
-	client.auth(uri.getUserInfo().split(":", 2)[1]);
-	client.getStatusCodeReply();
-	client.select(Integer.parseInt(uri.getPath().split("/", 2)[1]));
-	client.getStatusCodeReply();
+
+	String password = JedisURIHelper.getPassword(uri);
+	if (password != null) {
+	    client.auth(password);
+	    client.getStatusCodeReply();
+	}
+
+	Integer dbIndex = JedisURIHelper.getDBIndex(uri);
+	if (dbIndex > 0) {
+	    client.select(dbIndex);
+	    client.getStatusCodeReply();
+	}
     }
 
     public String ping() {
@@ -634,6 +655,37 @@ public class BinaryJedis implements BasicCommands, BinaryJedisCommands,
     }
 
     /**
+     * INCRBYFLOAT work just like {@link #incrBy(byte[]) INCRBY} but increments
+     * by floats instead of integers.
+     * <p>
+     * INCRBYFLOAT commands are limited to double precision floating point
+     * values.
+     * <p>
+     * Note: this is actually a string operation, that is, in Redis there are
+     * not "double" types. Simply the string stored at the key is parsed as a
+     * base double precision floating point value, incremented, and then
+     * converted back as a string. There is no DECRYBYFLOAT but providing a
+     * negative value will work as expected.
+     * <p>
+     * Time complexity: O(1)
+     * 
+     * @see #incr(byte[])
+     * @see #decr(byte[])
+     * @see #decrBy(byte[], long)
+     * 
+     * @param key
+     * @param integer
+     * @return Integer reply, this commands will reply with the new value of key
+     *         after the increment.
+     */
+    public Double incrByFloat(final byte[] key, final double integer) {
+	checkIsInMulti();
+	client.incrByFloat(key, integer);
+	String dval = client.getBulkReply();
+	return (dval != null ? new Double(dval) : null);
+    }
+
+    /**
      * Increment the number stored at key by one. If the key does not exist or
      * contains a value of a wrong type, set the key to the value of "0" before
      * to perform the increment operation.
@@ -823,6 +875,33 @@ public class BinaryJedis implements BasicCommands, BinaryJedisCommands,
 	checkIsInMulti();
 	client.hincrBy(key, field, value);
 	return client.getIntegerReply();
+    }
+
+    /**
+     * Increment the number stored at field in the hash at key by a double
+     * precision floating point value. If key does not exist, a new key holding
+     * a hash is created. If field does not exist or holds a string, the value
+     * is set to 0 before applying the operation. Since the value argument is
+     * signed you can use this command to perform both increments and
+     * decrements.
+     * <p>
+     * The range of values supported by HINCRBYFLOAT is limited to double
+     * precision floating point values.
+     * <p>
+     * <b>Time complexity:</b> O(1)
+     * 
+     * @param key
+     * @param field
+     * @param value
+     * @return Double precision floating point reply The new value at field
+     *         after the increment operation.
+     */
+    public Double hincrByFloat(final byte[] key, final byte[] field,
+	    final double value) {
+	checkIsInMulti();
+	client.hincrByFloat(key, field, value);
+	final String dval = client.getBulkReply();
+	return (dval != null ? new Double(dval) : null);
     }
 
     /**
@@ -1694,23 +1773,9 @@ public class BinaryJedis implements BasicCommands, BinaryJedisCommands,
 
     public Transaction multi() {
 	client.multi();
-	return new Transaction(client);
-    }
-
-    @Deprecated
-    /**
-     * This method is deprecated due to its error prone
-     * and will be removed on next major release
-     * You can use multi() instead
-     * @see https://github.com/xetorthio/jedis/pull/498
-     */
-    public List<Object> multi(final TransactionBlock jedisTransaction) {
-	List<Object> results = null;
-	jedisTransaction.setClient(client);
-    client.multi();
-    jedisTransaction.execute();
-    results = jedisTransaction.exec();
-	return results;
+	client.getOne(); // expected OK
+	transaction = new Transaction(client);
+	return transaction;
     }
 
     protected void checkIsInMulti() {
@@ -1729,8 +1794,24 @@ public class BinaryJedis implements BasicCommands, BinaryJedisCommands,
     }
 
     public void resetState() {
-	client.resetState();
-	client.getAll();
+	if (client.isConnected()) {
+	    if (transaction != null) {
+		transaction.clear();
+	    }
+
+	    if (pipeline != null) {
+		pipeline.clear();
+	    }
+
+	    if (client.isInWatch()) {
+		unwatch();
+	    }
+
+	    client.resetState();
+	}
+
+	transaction = null;
+	pipeline = null;
     }
 
     public String watch(final byte[]... keys) {
@@ -1744,7 +1825,7 @@ public class BinaryJedis implements BasicCommands, BinaryJedisCommands,
     }
 
     @Override
-	public void close() {
+    public void close() {
 	client.close();
     }
 
@@ -2132,21 +2213,8 @@ public class BinaryJedis implements BasicCommands, BinaryJedisCommands,
 	return client.getStatusCodeReply();
     }
 
-    @Deprecated
-    /**
-     * This method is deprecated due to its error prone with multi
-     * and will be removed on next major release
-     * You can use pipelined() instead
-     * @see https://github.com/xetorthio/jedis/pull/498
-     */
-    public List<Object> pipelined(final PipelineBlock jedisPipeline) {
-	jedisPipeline.setClient(client);
-	jedisPipeline.execute();
-	return jedisPipeline.syncAndReturnAll();
-    }
-
     public Pipeline pipelined() {
-	Pipeline pipeline = new Pipeline();
+	pipeline = new Pipeline();
 	pipeline.setClient(client);
 	return pipeline;
     }
@@ -2732,6 +2800,52 @@ public class BinaryJedis implements BasicCommands, BinaryJedisCommands,
 	return client.getIntegerReply();
     }
 
+    @Override
+    public Long zlexcount(final byte[] key, final byte[] min, final byte[] max) {
+	checkIsInMulti();
+	client.zlexcount(key, min, max);
+	return client.getIntegerReply();
+    }
+
+    @Override
+    public Set<byte[]> zrangeByLex(final byte[] key, final byte[] min,
+	    final byte[] max) {
+	checkIsInMulti();
+	client.zrangeByLex(key, min, max);
+	return new LinkedHashSet<byte[]>(client.getBinaryMultiBulkReply());
+    }
+
+    @Override
+    public Set<byte[]> zrangeByLex(final byte[] key, final byte[] min,
+	    final byte[] max, final int offset, final int count) {
+	checkIsInMulti();
+	client.zrangeByLex(key, min, max, offset, count);
+	return new LinkedHashSet<byte[]>(client.getBinaryMultiBulkReply());
+    }
+
+    @Override
+    public Set<byte[]> zrevrangeByLex(byte[] key, byte[] max, byte[] min) {
+	checkIsInMulti();
+	client.zrevrangeByLex(key, max, min);
+	return new LinkedHashSet<byte[]>(client.getBinaryMultiBulkReply());
+    }
+
+    @Override
+    public Set<byte[]> zrevrangeByLex(byte[] key, byte[] max, byte[] min,
+	    int offset, int count) {
+	checkIsInMulti();
+	client.zrevrangeByLex(key, max, min, offset, count);
+	return new LinkedHashSet<byte[]>(client.getBinaryMultiBulkReply());
+    }
+
+    @Override
+    public Long zremrangeByLex(final byte[] key, final byte[] min,
+	    final byte[] max) {
+	checkIsInMulti();
+	client.zremrangeByLex(key, min, max);
+	return client.getIntegerReply();
+    }
+
     /**
      * Synchronously save the DB on disk.
      * <p>
@@ -3126,6 +3240,16 @@ public class BinaryJedis implements BasicCommands, BinaryJedisCommands,
 	return client.getIntegerReply() == 1;
     }
 
+    public Long bitpos(final byte[] key, final boolean value) {
+	return bitpos(key, value, new BitPosParams());
+    }
+
+    public Long bitpos(final byte[] key, final boolean value,
+	    final BitPosParams params) {
+	client.bitpos(key, value, params);
+	return client.getIntegerReply();
+    }
+
     public Long setrange(byte[] key, long offset, byte[] value) {
 	client.setrange(key, offset, value);
 	return client.getIntegerReply();
@@ -3314,7 +3438,7 @@ public class BinaryJedis implements BasicCommands, BinaryJedisCommands,
 	return client.getStatusCodeReply();
     }
 
-    public Long pexpire(final byte[] key, final int milliseconds) {
+    public Long pexpire(final byte[] key, final long milliseconds) {
 	checkIsInMulti();
 	client.pexpire(key, milliseconds);
 	return client.getIntegerReply();
@@ -3330,13 +3454,6 @@ public class BinaryJedis implements BasicCommands, BinaryJedisCommands,
 	checkIsInMulti();
 	client.pttl(key);
 	return client.getIntegerReply();
-    }
-
-    public Double incrByFloat(final byte[] key, final double increment) {
-	checkIsInMulti();
-	client.incrByFloat(key, increment);
-	String relpy = client.getBulkReply();
-	return (relpy != null ? new Double(relpy) : null);
     }
 
     public String psetex(final byte[] key, final int milliseconds,
@@ -3396,14 +3513,6 @@ public class BinaryJedis implements BasicCommands, BinaryJedisCommands,
 	return client.getStatusCodeReply();
     }
 
-    public Double hincrByFloat(final byte[] key, final byte[] field,
-	    double increment) {
-	checkIsInMulti();
-	client.hincrByFloat(key, field, increment);
-	String relpy = client.getBulkReply();
-	return (relpy != null ? new Double(relpy) : null);
-    }
-
     /**
      * Syncrhonous replication of Redis as described here:
      * http://antirez.com/news/66
@@ -3415,6 +3524,102 @@ public class BinaryJedis implements BasicCommands, BinaryJedisCommands,
 	checkIsInMulti();
 	client.waitReplicas(replicas, timeout);
 	return client.getIntegerReply();
+    }
+
+    @Override
+    public Long pfadd(final byte[] key, final byte[]... elements) {
+	checkIsInMulti();
+	client.pfadd(key, elements);
+	return client.getIntegerReply();
+    }
+
+    @Override
+    public long pfcount(final byte[] key) {
+	checkIsInMulti();
+	client.pfcount(key);
+	return client.getIntegerReply();
+    }
+
+    @Override
+    public String pfmerge(final byte[] destkey, final byte[]... sourcekeys) {
+	checkIsInMulti();
+	client.pfmerge(destkey, sourcekeys);
+	return client.getStatusCodeReply();
+    }
+
+    @Override
+    public Long pfcount(byte[]... keys) {
+	checkIsInMulti();
+	client.pfcount(keys);
+	return client.getIntegerReply();
+    }
+
+    public ScanResult<byte[]> scan(final byte[] cursor) {
+	return scan(cursor, new ScanParams());
+    }
+
+    public ScanResult<byte[]> scan(final byte[] cursor, final ScanParams params) {
+	checkIsInMulti();
+	client.scan(cursor, params);
+	List<Object> result = client.getObjectMultiBulkReply();
+	byte[] newcursor = (byte[]) result.get(0);
+	List<byte[]> rawResults = (List<byte[]>) result.get(1);
+	return new ScanResult<byte[]>(newcursor, rawResults);
+    }
+
+    public ScanResult<Map.Entry<byte[], byte[]>> hscan(final byte[] key,
+	    final byte[] cursor) {
+	return hscan(key, cursor, new ScanParams());
+    }
+
+    public ScanResult<Map.Entry<byte[], byte[]>> hscan(final byte[] key,
+	    final byte[] cursor, final ScanParams params) {
+	checkIsInMulti();
+	client.hscan(key, cursor, params);
+	List<Object> result = client.getObjectMultiBulkReply();
+	byte[] newcursor = (byte[]) result.get(0);
+	List<Map.Entry<byte[], byte[]>> results = new ArrayList<Map.Entry<byte[], byte[]>>();
+	List<byte[]> rawResults = (List<byte[]>) result.get(1);
+	Iterator<byte[]> iterator = rawResults.iterator();
+	while (iterator.hasNext()) {
+	    results.add(new AbstractMap.SimpleEntry<byte[], byte[]>(iterator
+		    .next(), iterator.next()));
+	}
+	return new ScanResult<Map.Entry<byte[], byte[]>>(newcursor, results);
+    }
+
+    public ScanResult<byte[]> sscan(final byte[] key, final byte[] cursor) {
+	return sscan(key, cursor, new ScanParams());
+    }
+
+    public ScanResult<byte[]> sscan(final byte[] key, final byte[] cursor,
+	    final ScanParams params) {
+	checkIsInMulti();
+	client.sscan(key, cursor, params);
+	List<Object> result = client.getObjectMultiBulkReply();
+	byte[] newcursor = (byte[]) result.get(0);
+	List<byte[]> rawResults = (List<byte[]>) result.get(1);
+	return new ScanResult<byte[]>(newcursor, rawResults);
+    }
+
+    public ScanResult<Tuple> zscan(final byte[] key, final byte[] cursor) {
+	return zscan(key, cursor, new ScanParams());
+    }
+
+    public ScanResult<Tuple> zscan(final byte[] key, final byte[] cursor,
+	    final ScanParams params) {
+	checkIsInMulti();
+	client.zscan(key, cursor, params);
+	List<Object> result = client.getObjectMultiBulkReply();
+	byte[] newcursor = (byte[]) result.get(0);
+	List<Tuple> results = new ArrayList<Tuple>();
+	List<byte[]> rawResults = (List<byte[]>) result.get(1);
+	Iterator<byte[]> iterator = rawResults.iterator();
+	while (iterator.hasNext()) {
+	    results.add(new Tuple(iterator.next(), Double.valueOf(SafeEncoder
+		    .encode(iterator.next()))));
+	}
+	return new ScanResult<Tuple>(newcursor, results);
     }
 
 }

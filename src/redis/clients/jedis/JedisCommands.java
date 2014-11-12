@@ -10,6 +10,8 @@ import java.util.Set;
 public interface JedisCommands {
     String set(String key, String value);
 
+    String set(String key, String value, String nxxx, String expx, long time);
+
     String get(String key);
 
     Boolean exists(String key);
@@ -110,6 +112,8 @@ public interface JedisCommands {
 
     String srandmember(String key);
 
+    List<String> srandmember(String key, int count);
+
     Long strlen(String key);
 
     Long zadd(String key, double score, String member);
@@ -190,6 +194,21 @@ public interface JedisCommands {
 
     Long zremrangeByScore(String key, String start, String end);
 
+    Long zlexcount(final String key, final String min, final String max);
+
+    Set<String> zrangeByLex(final String key, final String min, final String max);
+
+    Set<String> zrangeByLex(final String key, final String min,
+	    final String max, final int offset, final int count);
+
+    Set<String> zrevrangeByLex(final String key, final String max,
+	    final String min);
+
+    Set<String> zrevrangeByLex(final String key, final String max,
+	    final String min, final int offset, final int count);
+
+    Long zremrangeByLex(final String key, final String min, final String max);
+
     Long linsert(String key, Client.LIST_POSITION where, String pivot,
 	    String value);
 
@@ -199,7 +218,11 @@ public interface JedisCommands {
 
     List<String> blpop(String arg);
 
+    List<String> blpop(int timeout, String key);
+
     List<String> brpop(String arg);
+
+    List<String> brpop(int timeout, String key);
 
     Long del(String key);
 
@@ -211,33 +234,15 @@ public interface JedisCommands {
 
     Long bitcount(final String key, long start, long end);
 
-    @Deprecated
-    /**
-     * This method is deprecated due to bug (scan cursor should be unsigned long)
-     * And will be removed on next major release
-     * @see https://github.com/xetorthio/jedis/issues/531 
-     */
-    ScanResult<Map.Entry<String, String>> hscan(final String key, int cursor);
+    ScanResult<Map.Entry<String, String>> hscan(final String key,
+	    final String cursor);
 
-    @Deprecated
-    /**
-     * This method is deprecated due to bug (scan cursor should be unsigned long)
-     * And will be removed on next major release
-     * @see https://github.com/xetorthio/jedis/issues/531 
-     */
-    ScanResult<String> sscan(final String key, int cursor);
-
-    @Deprecated
-    /**
-     * This method is deprecated due to bug (scan cursor should be unsigned long)
-     * And will be removed on next major release
-     * @see https://github.com/xetorthio/jedis/issues/531 
-     */
-    ScanResult<Tuple> zscan(final String key, int cursor);
-    
-    ScanResult<Map.Entry<String, String>> hscan(final String key, final String cursor);
-    
     ScanResult<String> sscan(final String key, final String cursor);
-    
+
     ScanResult<Tuple> zscan(final String key, final String cursor);
+
+    Long pfadd(final String key, final String... elements);
+
+    long pfcount(final String key);
+
 }

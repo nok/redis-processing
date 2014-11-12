@@ -10,6 +10,7 @@ import java.util.logging.Logger;
 import org.apache.commons.pool2.impl.GenericObjectPoolConfig;
 
 import redis.clients.jedis.exceptions.JedisConnectionException;
+import redis.clients.jedis.exceptions.JedisException;
 import redis.clients.util.Pool;
 
 public class JedisSentinelPool extends Pool<Jedis> {
@@ -65,6 +66,7 @@ public class JedisSentinelPool extends Pool<Jedis> {
     public JedisSentinelPool(String masterName, Set<String> sentinels,
 	    final GenericObjectPoolConfig poolConfig, int timeout,
 	    final String password, final int database) {
+
 	this.poolConfig = poolConfig;
 	this.timeout = timeout;
 	this.password = password;
@@ -74,15 +76,7 @@ public class JedisSentinelPool extends Pool<Jedis> {
 	initPool(master);
     }
 
-    public void returnBrokenResource(final Jedis resource) {
-	returnBrokenResourceObject(resource);
-    }
-
-    public void returnResource(final Jedis resource) {
-	resource.resetState();
-	returnResourceObject(resource);
-    }
-
+    private volatile JedisFactory factory;
     private volatile HostAndPort currentHostMaster;
 
     public void destroy() {
@@ -100,10 +94,20 @@ public class JedisSentinelPool extends Pool<Jedis> {
     private void initPool(HostAndPort master) {
 	if (!master.equals(currentHostMaster)) {
 	    currentHostMaster = master;
+	    if (factory == null) {
+		factory = new JedisFactory(master.getHost(), master.getPort(),
+			timeout, password, database);
+		initPool(poolConfig, factory);
+	    } else {
+		factory.setHostAndPort(currentHostMaster);
+		// although we clear the pool, we still have to check the
+		// returned object
+		// in getResource, this call only clears idle instances, not
+		// borrowed instances
+		internalPool.clear();
+	    }
+
 	    log.info("Created JedisPool to master at " + master);
-	    initPool(poolConfig,
-		    new JedisFactory(master.getHost(), master.getPort(),
-			    timeout, password, database));
 	}
     }
 
@@ -111,41 +115,55 @@ public class JedisSentinelPool extends Pool<Jedis> {
 	    final String masterName) {
 
 	HostAndPort master = null;
-	boolean running = true;
+	boolean sentinelAvailable = false;
 
-	outer: while (running) {
+	log.info("Trying to find master from available Sentinels...");
 
-	    log.info("Trying to find master from available Sentinels...");
+	for (String sentinel : sentinels) {
+	    final HostAndPort hap = toHostAndPort(Arrays.asList(sentinel
+		    .split(":")));
 
-	    for (String sentinel : sentinels) {
+	    log.fine("Connecting to Sentinel " + hap);
 
-		final HostAndPort hap = toHostAndPort(Arrays.asList(sentinel
-			.split(":")));
+	    Jedis jedis = null;
+	    try {
+		jedis = new Jedis(hap.getHost(), hap.getPort());
 
-		log.fine("Connecting to Sentinel " + hap);
+		List<String> masterAddr = jedis
+			.sentinelGetMasterAddrByName(masterName);
 
-		try {
-		    Jedis jedis = new Jedis(hap.getHost(), hap.getPort());
+		// connected to sentinel...
+		sentinelAvailable = true;
 
-		    if (master == null) {
-			master = toHostAndPort(jedis
-				.sentinelGetMasterAddrByName(masterName));
-			log.fine("Found Redis master at " + master);
-			jedis.disconnect();
-			break outer;
-		    }
-		} catch (JedisConnectionException e) {
-		    log.warning("Cannot connect to sentinel running @ " + hap
-			    + ". Trying next one.");
+		if (masterAddr == null || masterAddr.size() != 2) {
+		    log.warning("Can not get master addr, master name: "
+			    + masterName + ". Sentinel: " + hap + ".");
+		    continue;
+		}
+
+		master = toHostAndPort(masterAddr);
+		log.fine("Found Redis master at " + master);
+		break;
+	    } catch (JedisConnectionException e) {
+		log.warning("Cannot connect to sentinel running @ " + hap
+			+ ". Trying next one.");
+	    } finally {
+		if (jedis != null) {
+		    jedis.close();
 		}
 	    }
+	}
 
-	    try {
-		log.severe("All sentinels down, cannot determine where is "
-			+ masterName + " master is running... sleeping 1000ms.");
-		Thread.sleep(1000);
-	    } catch (InterruptedException e) {
-		e.printStackTrace();
+	if (master == null) {
+	    if (sentinelAvailable) {
+		// can connect to sentinel, but master name seems to not
+		// monitored
+		throw new JedisException("Can connect to sentinel, but "
+			+ masterName + " seems to be not monitored...");
+	    } else {
+		throw new JedisConnectionException(
+			"All sentinels down, cannot determine where is "
+				+ masterName + " master is running...");
 	    }
 	}
 
@@ -171,29 +189,36 @@ public class JedisSentinelPool extends Pool<Jedis> {
 	return new HostAndPort(host, port);
     }
 
-    protected class JedisPubSubAdapter extends JedisPubSub {
-	@Override
-	public void onMessage(String channel, String message) {
-	}
+    @Override
+    public Jedis getResource() {
+	while (true) {
+	    Jedis jedis = super.getResource();
+	    jedis.setDataSource(this);
 
-	@Override
-	public void onPMessage(String pattern, String channel, String message) {
-	}
+	    // get a reference because it can change concurrently
+	    final HostAndPort master = currentHostMaster;
+	    final HostAndPort connection = new HostAndPort(jedis.getClient()
+		    .getHost(), jedis.getClient().getPort());
 
-	@Override
-	public void onPSubscribe(String pattern, int subscribedChannels) {
+	    if (master.equals(connection)) {
+		// connected to the correct master
+		return jedis;
+	    } else {
+		returnBrokenResource(jedis);
+	    }
 	}
+    }
 
-	@Override
-	public void onPUnsubscribe(String pattern, int subscribedChannels) {
+    public void returnBrokenResource(final Jedis resource) {
+	if (resource != null) {
+	    returnBrokenResourceObject(resource);
 	}
+    }
 
-	@Override
-	public void onSubscribe(String channel, int subscribedChannels) {
-	}
-
-	@Override
-	public void onUnsubscribe(String channel, int subscribedChannels) {
+    public void returnResource(final Jedis resource) {
+	if (resource != null) {
+	    resource.resetState();
+	    returnResourceObject(resource);
 	}
     }
 
@@ -230,7 +255,7 @@ public class JedisSentinelPool extends Pool<Jedis> {
 		j = new Jedis(host, port);
 
 		try {
-		    j.subscribe(new JedisPubSubAdapter() {
+		    j.subscribe(new JedisPubSub() {
 			@Override
 			public void onMessage(String channel, String message) {
 			    log.fine("Sentinel " + host + ":" + port

@@ -143,6 +143,26 @@ abstract class PipelineBase extends Queable implements BinaryRedisPipeline,
 	return getResponse(BuilderFactory.BOOLEAN);
     }
 
+    public Response<Long> bitpos(final String key, final boolean value) {
+	return bitpos(key, value, new BitPosParams());
+    }
+
+    public Response<Long> bitpos(final String key, final boolean value,
+	    final BitPosParams params) {
+	getClient(key).bitpos(key, value, params);
+	return getResponse(BuilderFactory.LONG);
+    }
+
+    public Response<Long> bitpos(final byte[] key, final boolean value) {
+	return bitpos(key, value, new BitPosParams());
+    }
+
+    public Response<Long> bitpos(final byte[] key, final boolean value,
+	    final BitPosParams params) {
+	getClient(key).bitpos(key, value, params);
+	return getResponse(BuilderFactory.LONG);
+    }
+
     public Response<String> getrange(String key, long startOffset,
 	    long endOffset) {
 	getClient(key).getrange(key, startOffset, endOffset);
@@ -159,9 +179,10 @@ abstract class PipelineBase extends Queable implements BinaryRedisPipeline,
 	return getResponse(BuilderFactory.BYTE_ARRAY);
     }
 
-    public Response<Long> getrange(byte[] key, long startOffset, long endOffset) {
+    public Response<byte[]> getrange(byte[] key, long startOffset,
+	    long endOffset) {
 	getClient(key).getrange(key, startOffset, endOffset);
-	return getResponse(BuilderFactory.LONG);
+	return getResponse(BuilderFactory.BYTE_ARRAY);
     }
 
     public Response<Long> hdel(String key, String... field) {
@@ -1008,6 +1029,94 @@ abstract class PipelineBase extends Queable implements BinaryRedisPipeline,
 	return getResponse(BuilderFactory.DOUBLE);
     }
 
+    @Override
+    public Response<Long> zlexcount(final byte[] key, final byte[] min,
+	    final byte[] max) {
+	getClient(key).zlexcount(key, min, max);
+	return getResponse(BuilderFactory.LONG);
+    }
+
+    @Override
+    public Response<Long> zlexcount(final String key, final String min,
+	    final String max) {
+	getClient(key).zlexcount(key, min, max);
+	return getResponse(BuilderFactory.LONG);
+    }
+
+    @Override
+    public Response<Set<byte[]>> zrangeByLex(final byte[] key,
+	    final byte[] min, final byte[] max) {
+	getClient(key).zrangeByLex(key, min, max);
+	return getResponse(BuilderFactory.BYTE_ARRAY_ZSET);
+    }
+
+    @Override
+    public Response<Set<String>> zrangeByLex(final String key,
+	    final String min, final String max) {
+	getClient(key).zrangeByLex(key, min, max);
+	return getResponse(BuilderFactory.STRING_ZSET);
+    }
+
+    @Override
+    public Response<Set<byte[]>> zrangeByLex(final byte[] key,
+	    final byte[] min, final byte[] max, final int offset,
+	    final int count) {
+	getClient(key).zrangeByLex(key, min, max, offset, count);
+	return getResponse(BuilderFactory.BYTE_ARRAY_ZSET);
+    }
+
+    @Override
+    public Response<Set<String>> zrangeByLex(final String key,
+	    final String min, final String max, final int offset,
+	    final int count) {
+	getClient(key).zrangeByLex(key, min, max, offset, count);
+	return getResponse(BuilderFactory.STRING_ZSET);
+    }
+
+    @Override
+    public Response<Set<byte[]>> zrevrangeByLex(final byte[] key,
+	    final byte[] max, final byte[] min) {
+	getClient(key).zrevrangeByLex(key, max, min);
+	return getResponse(BuilderFactory.BYTE_ARRAY_ZSET);
+    }
+
+    @Override
+    public Response<Set<String>> zrevrangeByLex(final String key,
+	    final String max, final String min) {
+	getClient(key).zrevrangeByLex(key, max, min);
+	return getResponse(BuilderFactory.STRING_ZSET);
+    }
+
+    @Override
+    public Response<Set<byte[]>> zrevrangeByLex(final byte[] key,
+	    final byte[] max, final byte[] min, final int offset,
+	    final int count) {
+	getClient(key).zrevrangeByLex(key, max, min, offset, count);
+	return getResponse(BuilderFactory.BYTE_ARRAY_ZSET);
+    }
+
+    @Override
+    public Response<Set<String>> zrevrangeByLex(final String key,
+	    final String max, final String min, final int offset,
+	    final int count) {
+	getClient(key).zrevrangeByLex(key, max, min, offset, count);
+	return getResponse(BuilderFactory.STRING_ZSET);
+    }
+
+    @Override
+    public Response<Long> zremrangeByLex(final byte[] key, final byte[] min,
+	    final byte[] max) {
+	getClient(key).zremrangeByLex(key, min, max);
+	return getResponse(BuilderFactory.LONG);
+    }
+
+    @Override
+    public Response<Long> zremrangeByLex(final String key, final String min,
+	    final String max) {
+	getClient(key).zremrangeByLex(key, min, max);
+	return getResponse(BuilderFactory.LONG);
+    }
+
     public Response<Long> bitcount(String key) {
 	getClient(key).bitcount(key);
 	return getResponse(BuilderFactory.LONG);
@@ -1080,12 +1189,12 @@ abstract class PipelineBase extends Queable implements BinaryRedisPipeline,
 	return getResponse(BuilderFactory.LONG);
     }
 
-    public Response<Long> pexpire(String key, int milliseconds) {
+    public Response<Long> pexpire(String key, long milliseconds) {
 	getClient(key).pexpire(key, milliseconds);
 	return getResponse(BuilderFactory.LONG);
     }
 
-    public Response<Long> pexpire(byte[] key, int milliseconds) {
+    public Response<Long> pexpire(byte[] key, long milliseconds) {
 	getClient(key).pexpire(key, milliseconds);
 	return getResponse(BuilderFactory.LONG);
     }
@@ -1202,6 +1311,30 @@ abstract class PipelineBase extends Queable implements BinaryRedisPipeline,
     public Response<String> evalsha(String sha1, int numKeys, String[] argv) {
 	getClient(sha1).evalsha(sha1, numKeys, argv);
 	return getResponse(BuilderFactory.STRING);
+    }
+
+    @Override
+    public Response<Long> pfadd(byte[] key, byte[]... elements) {
+	getClient(key).pfadd(key, elements);
+	return getResponse(BuilderFactory.LONG);
+    }
+
+    @Override
+    public Response<Long> pfcount(byte[] key) {
+	getClient(key).pfcount(key);
+	return getResponse(BuilderFactory.LONG);
+    }
+
+    @Override
+    public Response<Long> pfadd(String key, String... elements) {
+	getClient(key).pfadd(key, elements);
+	return getResponse(BuilderFactory.LONG);
+    }
+
+    @Override
+    public Response<Long> pfcount(String key) {
+	getClient(key).pfcount(key);
+	return getResponse(BuilderFactory.LONG);
     }
 
 }

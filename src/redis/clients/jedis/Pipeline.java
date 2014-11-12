@@ -26,7 +26,13 @@ public class Pipeline extends MultiKeyPipelineBase {
 	    for (int i = 0; i < list.size(); i++) {
 		Response<?> response = responses.get(i);
 		response.set(list.get(i));
-		values.add(response.get());
+		Object builtResponse;
+		try {
+		    builtResponse = response.get();
+		} catch (JedisDataException e) {
+		    builtResponse = e;
+		}
+		values.add(builtResponse);
 	    }
 	    return values;
 	}
@@ -69,20 +75,33 @@ public class Pipeline extends MultiKeyPipelineBase {
 	return client;
     }
 
+    public void clear() {
+	if (isInMulti()) {
+	    discard();
+	}
+
+	sync();
+    }
+
+    public boolean isInMulti() {
+	return currentMulti != null;
+    }
+
     /**
-     * Syncronize pipeline by reading all responses. This operation close the
+     * Synchronize pipeline by reading all responses. This operation close the
      * pipeline. In order to get return values from pipelined commands, capture
      * the different Response<?> of the commands you execute.
      */
     public void sync() {
-	List<Object> unformatted = client.getAll();
-	for (Object o : unformatted) {
-	    generateResponse(o);
-	}
+    	if (getPipelinedResponseLength() > 0) {
+            List<Object> unformatted = client.getMany(getPipelinedResponseLength());
+            for (Object o : unformatted) {
+                generateResponse(o);
+            }
+    	}
     }
-
     /**
-     * Syncronize pipeline by reading all responses. This operation close the
+     * Synchronize pipeline by reading all responses. This operation close the
      * pipeline. Whenever possible try to avoid using this version and use
      * Pipeline.sync() as it won't go through all the responses and generate the
      * right response type (usually it is a waste of time).
@@ -90,26 +109,34 @@ public class Pipeline extends MultiKeyPipelineBase {
      * @return A list of all the responses in the order you executed them.
      */
     public List<Object> syncAndReturnAll() {
-	List<Object> unformatted = client.getAll();
-	List<Object> formatted = new ArrayList<Object>();
-
-	for (Object o : unformatted) {
-	    try {
-		formatted.add(generateResponse(o).get());
-	    } catch (JedisDataException e) {
-		formatted.add(e);
-	    }
-	}
-	return formatted;
+        if (getPipelinedResponseLength() > 0) {
+            List<Object> unformatted = client.getMany(getPipelinedResponseLength());
+            List<Object> formatted = new ArrayList<Object>();
+            for (Object o : unformatted) {
+                try {
+                    formatted.add(generateResponse(o).get());
+                } catch (JedisDataException e) {
+                    formatted.add(e);
+                }
+            }
+            return formatted;
+        } else {
+            return java.util.Collections.<Object>emptyList();
+        }
     }
 
     public Response<String> discard() {
+	if (currentMulti == null)
+	    throw new JedisDataException("DISCARD without MULTI");
 	client.discard();
 	currentMulti = null;
 	return getResponse(BuilderFactory.STRING);
     }
 
     public Response<List<Object>> exec() {
+	if (currentMulti == null)
+	    throw new JedisDataException("EXEC without MULTI");
+
 	client.exec();
 	Response<List<Object>> response = super.getResponse(currentMulti);
 	currentMulti.setResponseDependency(response);
@@ -118,6 +145,9 @@ public class Pipeline extends MultiKeyPipelineBase {
     }
 
     public Response<String> multi() {
+	if (currentMulti != null)
+	    throw new JedisDataException("MULTI calls can not be nested");
+
 	client.multi();
 	Response<String> response = getResponse(BuilderFactory.STRING); // Expecting
 									// OK

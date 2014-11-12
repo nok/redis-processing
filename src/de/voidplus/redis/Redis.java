@@ -1,16 +1,16 @@
 package de.voidplus.redis;
 
 import processing.core.*;
-import java.net.URI;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisShardInfo;
 
+import java.net.URI;
 
 public class Redis extends Jedis {
 	
 	private PApplet parent;
-	public final static String WRAPPER_VERSION = "1.1";
-	public final static String JEDIS_VERSION = "2.4.0";
+	public final static String WRAPPER_VERSION = "1.1.1";
+	public final static String JEDIS_VERSION = "2.6.0";
 	public final static String REDIS_VERSION = "2.8.5";
 	
 	public Redis(PApplet parent, String host) {
@@ -24,13 +24,13 @@ public class Redis extends Jedis {
 	}
 
     public Redis(PApplet parent, final String host, final int port, final int timeout) {
-    	super(host, port, timeout);
-    	this.init(parent);
+		super(host, port, timeout);
+		this.init(parent);
     }
 
     public Redis(PApplet parent, JedisShardInfo shardInfo) {
-    	super(shardInfo);
-    	this.init(parent);
+		super(shardInfo);
+		this.init(parent);
     }
 
     public Redis(PApplet parent, URI uri) {
@@ -38,23 +38,23 @@ public class Redis extends Jedis {
     	this.init(parent);
     }
 	
-	private void init(PApplet parent){
+	private void init(PApplet parent) {
 		this.parent = parent;
-		this.parent.println("# Redis-Wrapper v"+Redis.WRAPPER_VERSION+" - https://github.com/voidplus/redis-processing");
-		this.parent.println("# Jedis-Library v"+Redis.JEDIS_VERSION+" with Redis v"+Redis.REDIS_VERSION+" support - https://github.com/xetorthio/jedis");
-		this.parent.registerDispose(this);
+		PApplet.println("# Redis-Wrapper v"+Redis.WRAPPER_VERSION+" - https://github.com/voidplus/redis-processing");
+		PApplet.println("# Jedis-Library v"+Redis.JEDIS_VERSION+" with Redis v"+Redis.REDIS_VERSION+" support - https://github.com/xetorthio/jedis");
+		this.parent.registerMethod("dispose", this);
 		
 		try {
 			this.ping();
-		} catch (Exception e){
-			this.parent.println("# Error: Redis-Serer not found ... exit sketch.");
-			this.parent.println(e.getMessage());
-			this.parent.exit();
+			PApplet.println("# Info: Redis-Serer found.");
+		} catch (Exception e) {
+			PApplet.println("# Error: Redis-Serer not found: "+e.getMessage());
+			// this.parent.exit();
 		}
 	}
 	
-	public void dispose(){
-		if(this.isConnected()){
+	public void dispose() {
+		if (this.isConnected()) {
 			this.disconnect();
 		}
 	}

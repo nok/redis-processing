@@ -4,7 +4,6 @@ import redis.clients.jedis.exceptions.JedisAskDataException;
 import redis.clients.jedis.exceptions.JedisClusterException;
 import redis.clients.jedis.exceptions.JedisClusterMaxRedirectionsException;
 import redis.clients.jedis.exceptions.JedisConnectionException;
-import redis.clients.jedis.exceptions.JedisException;
 import redis.clients.jedis.exceptions.JedisMovedDataException;
 import redis.clients.jedis.exceptions.JedisRedirectionException;
 import redis.clients.util.JedisClusterCRC16;
@@ -14,6 +13,7 @@ public abstract class JedisClusterCommand<T> {
     private JedisClusterConnectionHandler connectionHandler;
     private int commandTimeout;
     private int redirections;
+    private ThreadLocal<Jedis> askConnection = new ThreadLocal<Jedis>();
 
     public JedisClusterCommand(JedisClusterConnectionHandler connectionHandler,
 	    int timeout, int maxRedirections) {
@@ -42,20 +42,23 @@ public abstract class JedisClusterCommand<T> {
 
 	Jedis connection = null;
 	try {
-	    if (tryRandomNode) {
-		connection = connectionHandler.getConnection();
-	    } else {
-		connection = connectionHandler
-			.getConnectionFromSlot(JedisClusterCRC16.getSlot(key));
-	    }
 
 	    if (asking) {
 		// TODO: Pipeline asking with the original command to make it
 		// faster....
+		connection = askConnection.get();
 		connection.asking();
 
 		// if asking success, reset asking flag
 		asking = false;
+	    } else {
+		if (tryRandomNode) {
+		    connection = connectionHandler.getConnection();
+		} else {
+		    connection = connectionHandler
+			    .getConnectionFromSlot(JedisClusterCRC16
+				    .getSlot(key));
+		}
 	    }
 
 	    return execute(connection);
@@ -64,33 +67,35 @@ public abstract class JedisClusterCommand<T> {
 		// maybe all connection is down
 		throw jce;
 	    }
-	    
+
 	    releaseConnection(connection, true);
 	    connection = null;
-	    
+
 	    // retry with random connection
-	    return runWithRetries(key, redirections--, true, asking);
+	    return runWithRetries(key, redirections - 1, true, asking);
 	} catch (JedisRedirectionException jre) {
 	    if (jre instanceof JedisAskDataException) {
 		asking = true;
+		askConnection.set(this.connectionHandler
+			.getConnectionFromNode(jre.getTargetNode()));
 	    } else if (jre instanceof JedisMovedDataException) {
-		// TODO : In antirez's redis-rb-cluster implementation, 
-		// it rebuilds cluster's slot and node cache
+		// it rebuilds cluster's slot cache
+		// recommended by Redis cluster specification
+		this.connectionHandler.renewSlotCache();
+	    } else {
+		throw new JedisClusterException(jre);
 	    }
-
-	    this.connectionHandler.assignSlotToNode(jre.getSlot(),
-		    jre.getTargetNode());
 
 	    releaseConnection(connection, false);
 	    connection = null;
-	    
+
 	    return runWithRetries(key, redirections - 1, false, asking);
 	} finally {
 	    releaseConnection(connection, false);
 	}
 
     }
-    
+
     private void releaseConnection(Jedis connection, boolean broken) {
 	if (connection != null) {
 	    if (broken) {

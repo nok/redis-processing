@@ -1,5 +1,6 @@
 package redis.clients.jedis;
 
+import java.io.Closeable;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -8,8 +9,13 @@ import java.util.regex.Pattern;
 
 import redis.clients.jedis.BinaryClient.LIST_POSITION;
 import redis.clients.util.Hashing;
+import redis.clients.util.Pool;
 
-public class ShardedJedis extends BinaryShardedJedis implements JedisCommands {
+public class ShardedJedis extends BinaryShardedJedis implements JedisCommands,
+	Closeable {
+
+    protected Pool<ShardedJedis> dataSource = null;
+
     public ShardedJedis(List<JedisShardInfo> shards) {
 	super(shards);
     }
@@ -30,6 +36,13 @@ public class ShardedJedis extends BinaryShardedJedis implements JedisCommands {
     public String set(String key, String value) {
 	Jedis j = getShard(key);
 	return j.set(key, value);
+    }
+
+    @Override
+    public String set(String key, String value, String nxxx, String expx,
+	    long time) {
+	Jedis j = getShard(key);
+	return j.set(key, value, nxxx, expx, time);
     }
 
     public String get(String key) {
@@ -112,9 +125,19 @@ public class ShardedJedis extends BinaryShardedJedis implements JedisCommands {
 	return j.blpop(arg);
     }
 
+    public List<String> blpop(int timeout, String key) {
+	Jedis j = getShard(key);
+	return j.blpop(timeout, key);
+    }
+
     public List<String> brpop(String arg) {
 	Jedis j = getShard(arg);
 	return j.brpop(arg);
+    }
+
+    public List<String> brpop(int timeout, String key) {
+	Jedis j = getShard(key);
+	return j.brpop(timeout, key);
     }
 
     public Long decrBy(String key, long integer) {
@@ -130,6 +153,11 @@ public class ShardedJedis extends BinaryShardedJedis implements JedisCommands {
     public Long incrBy(String key, long integer) {
 	Jedis j = getShard(key);
 	return j.incrBy(key, integer);
+    }
+
+    public Double incrByFloat(String key, double integer) {
+	Jedis j = getShard(key);
+	return j.incrByFloat(key, integer);
     }
 
     public Long incr(String key) {
@@ -175,6 +203,11 @@ public class ShardedJedis extends BinaryShardedJedis implements JedisCommands {
     public Long hincrBy(String key, String field, long value) {
 	Jedis j = getShard(key);
 	return j.hincrBy(key, field, value);
+    }
+
+    public Double hincrByFloat(String key, String field, double value) {
+	Jedis j = getShard(key);
+	return j.hincrByFloat(key, field, value);
     }
 
     public Boolean hexists(String key, String field) {
@@ -320,6 +353,12 @@ public class ShardedJedis extends BinaryShardedJedis implements JedisCommands {
     public String srandmember(String key) {
 	Jedis j = getShard(key);
 	return j.srandmember(key);
+    }
+
+    @Override
+    public List<String> srandmember(String key, int count) {
+	Jedis j = getShard(key);
+	return j.srandmember(key, count);
     }
 
     public Long zadd(String key, double score, String member) {
@@ -507,6 +546,40 @@ public class ShardedJedis extends BinaryShardedJedis implements JedisCommands {
 	return j.zremrangeByScore(key, start, end);
     }
 
+    @Override
+    public Long zlexcount(final String key, final String min, final String max) {
+	return getShard(key).zlexcount(key, min, max);
+    }
+
+    @Override
+    public Set<String> zrangeByLex(final String key, final String min,
+	    final String max) {
+	return getShard(key).zrangeByLex(key, min, max);
+    }
+
+    @Override
+    public Set<String> zrangeByLex(final String key, final String min,
+	    final String max, final int offset, final int count) {
+	return getShard(key).zrangeByLex(key, min, max, offset, count);
+    }
+
+    @Override
+    public Set<String> zrevrangeByLex(String key, String max, String min) {
+	return getShard(key).zrevrangeByLex(key, max, min);
+    }
+
+    @Override
+    public Set<String> zrevrangeByLex(String key, String max, String min,
+	    int offset, int count) {
+	return getShard(key).zrevrangeByLex(key, max, min, offset, count);
+    }
+
+    @Override
+    public Long zremrangeByLex(final String key, final String min,
+	    final String max) {
+	return getShard(key).zremrangeByLex(key, min, max);
+    }
+
     public Long linsert(String key, LIST_POSITION where, String pivot,
 	    String value) {
 	Jedis j = getShard(key);
@@ -523,51 +596,64 @@ public class ShardedJedis extends BinaryShardedJedis implements JedisCommands {
 	return j.bitcount(key, start, end);
     }
 
-    @Deprecated
-    /**
-     * This method is deprecated due to bug (scan cursor should be unsigned long)
-     * And will be removed on next major release
-     * @see https://github.com/xetorthio/jedis/issues/531 
-     */
-    public ScanResult<Entry<String, String>> hscan(String key, int cursor) {
+    public ScanResult<Entry<String, String>> hscan(String key,
+	    final String cursor) {
 	Jedis j = getShard(key);
 	return j.hscan(key, cursor);
     }
 
-    @Deprecated
-    /**
-     * This method is deprecated due to bug (scan cursor should be unsigned long)
-     * And will be removed on next major release
-     * @see https://github.com/xetorthio/jedis/issues/531 
-     */
-    public ScanResult<String> sscan(String key, int cursor) {
-	Jedis j = getShard(key);
-	return j.sscan(key, cursor);
-    }
-
-    @Deprecated
-    /**
-     * This method is deprecated due to bug (scan cursor should be unsigned long)
-     * And will be removed on next major release
-     * @see https://github.com/xetorthio/jedis/issues/531 
-     */
-    public ScanResult<Tuple> zscan(String key, int cursor) {
-	Jedis j = getShard(key);
-	return j.zscan(key, cursor);
-    }
-    
-    public ScanResult<Entry<String, String>> hscan(String key, final String cursor) {
-	Jedis j = getShard(key);
-	return j.hscan(key, cursor);
-    }
-    
     public ScanResult<String> sscan(String key, final String cursor) {
 	Jedis j = getShard(key);
 	return j.sscan(key, cursor);
     }
-    
+
     public ScanResult<Tuple> zscan(String key, final String cursor) {
 	Jedis j = getShard(key);
 	return j.zscan(key, cursor);
     }
+
+    @Override
+    public void close() {
+	if (dataSource != null) {
+	    boolean broken = false;
+
+	    for (Jedis jedis : getAllShards()) {
+		if (jedis.getClient().isBroken()) {
+		    broken = true;
+		}
+	    }
+
+	    if (broken) {
+		dataSource.returnBrokenResource(this);
+	    } else {
+		this.resetState();
+		dataSource.returnResource(this);
+	    }
+
+	} else {
+	    disconnect();
+	}
+    }
+
+    public void setDataSource(Pool<ShardedJedis> shardedJedisPool) {
+	this.dataSource = shardedJedisPool;
+    }
+
+    public void resetState() {
+	for (Jedis jedis : getAllShards()) {
+	    jedis.resetState();
+	}
+    }
+
+    public Long pfadd(String key, String... elements) {
+	Jedis j = getShard(key);
+	return j.pfadd(key, elements);
+    }
+
+    @Override
+    public long pfcount(String key) {
+	Jedis j = getShard(key);
+	return j.pfcount(key);
+    }
+
 }

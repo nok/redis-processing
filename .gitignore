@@ -8,3 +8,5 @@ resources/
 web/
 src/development/
 bin/
+
+.copy_jedish.sh

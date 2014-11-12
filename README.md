@@ -3,38 +3,71 @@
 Wrapper to use [Redis](http://redis.io/) in [Processing](http://processing.org/). It's based on [Jedis](https://github.com/xetorthio/jedis), a small Java client by [Jonathan Leibiusky](https://github.com/xetorthio).
 
 
+## Table of Contents
+
+- [About](#about)
+- [Download](#download)
+- [Installation](#installation)
+- [Tested](#tested)
+- [Examples](#examples)
+- [Usage](#usage)
+- [Links](#links)
+- [Questions?](#questions)
+- [License](#license)
+
+
 ## About
 
-> [Introduction to Redis](http://redis.io/topics/introduction): Redis is an open source, BSD licensed, advanced key-value store. It is often referred to as a data structure server since keys can contain strings, hashes, lists, sets and sorted sets.
+[Introduction to Redis](http://redis.io/topics/introduction): Redis is an open source, BSD licensed, advanced key-value store. It is often referred to as a data structure server since keys can contain strings, hashes, lists, sets and sorted sets.
+
 
 ## Download
 
-* [Redis-Wrapper v1.1](https://raw.github.com/voidplus/redis-processing/master/download/Redis.zip) (Jedis 2.4.0 with Redis v2.8.5 support)
+* [Redis-Wrapper v1.1.1](download/Redis.zip?raw=true) includes **Jedis v2.6.0** with **Redis v2.8.5** support.
 
 
 ## Installation
 
-#### Processing library:
 
-Unzip and put the extracted *Redis* folder into the libraries folder of your Processing sketches. Reference and examples are included in the *Redis* folder.
+### Processing library
 
-#### Redis server:
+Unzip and put the extracted *Redis* folder into the libraries folder of your Processing sketches. Reference and examples are included in the *Redis* folder. For more help read the [tutorial](http://www.learningprocessing.com/tutorials/libraries/) by [Daniel Shiffman](https://github.com/shiffman).
+
+
+### Redis server
 
 You can follow the official installation steps [here](http://redis.io/download):
 
 ```
-$ wget http://download.redis.io/releases/redis-2.8.6.tar.gz
-$ tar xzf redis-2.8.6.tar.gz
-$ cd redis-2.8.6
+$ wget http://download.redis.io/releases/redis-2.8.17.tar.gz
+$ tar xzf redis-2.8.17.tar.gz
+$ cd redis-2.8.17
 $ make
 ```
 
-Or use [Homebrew](http://brew.sh/) (OSX):
+Or you can use [Homebrew](http://brew.sh/) (OS X):
 
 ```
 $ brew install redis
 ```
 
+## Tested
+
+System:
+
+* **OSX** (10.10 Yosemite)
+* **Windows** (*not tested yet, but x86 and x64 should work*)
+
+Processing Version:
+
+* **2.2.1**
+* 2.1.1
+* 2.1.0
+
+
+## Examples
+
+* [Basic](#usage) → [e1_basic.pde](examples/e1_basic/e1_basic.pde)
 
 
 ## Usage
@@ -61,24 +94,6 @@ void setup(){
     println(redis.get("key"));
 }
 ```
-
-
-## Examples
-
-* [Basic](https://github.com/voidplus/redis-processing/blob/master/examples/e1_basic/e1_basic.pde)
-
-
-## Tested
-
-System:
-
-* OSX
-* Windows (*not tested yet, but x86 and x64 should work*)
-
-Processing Version:
-
-* 2.1.1
-* 2.1.0
 
 
 ## Links
