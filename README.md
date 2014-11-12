@@ -38,7 +38,7 @@ Unzip and put the extracted *Redis* folder into the libraries folder of your Pro
 
 You can follow the official installation steps [here](http://redis.io/download):
 
-```
+```bash
 $ wget http://download.redis.io/releases/redis-2.8.17.tar.gz
 $ tar xzf redis-2.8.17.tar.gz
 $ cd redis-2.8.17
@@ -47,7 +47,7 @@ $ make
 
 Or you can use [Homebrew](http://brew.sh/) (OS X):
 
-```
+```bash
 $ brew install redis
 ```
 
@@ -74,13 +74,13 @@ Processing Version:
 
 Start a Redis server:
 
-```
+```bash
 $ redis-server --port 6379
 ```
 
 Run the following sketch:
 
-```
+```java
 import de.voidplus.redis.*;
 
 Redis redis;
