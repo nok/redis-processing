@@ -23,7 +23,7 @@ Wrapper to use [Redis](http://redis.io/) in [Processing](http://processing.org/)
 
 ## Download
 
-* [Redis-Wrapper v1.1.1](download/Redis.zip?raw=true) includes **Jedis v2.6.0** with **Redis v2.8.5** support.
+* [Redis-Wrapper v1.1.2](download/Redis.zip?raw=true) includes **Jedis v3.0.0** with **Redis v2.8.5** support.
 
 
 ## Installation
@@ -108,9 +108,9 @@ Useful links for developers:
 
 ## Questions?
 
-Feel free to contact me via [Twitter](http://twitter.voidplus.de).
+Don't be shy and feel free to contact me on Twitter: [@darius_morawiec](https://twitter.com/darius_morawiec)
 
 
 ## License
 
-The wrapper is Open Source Software released under the [License](https://raw.github.com/voidplus/redis-processing/master/LICENSE.txt). It's developed by [Darius Morawiec](http://voidplus.de).
+The wrapper is Open Source Software released under the [License](LICENSE.txt).

@@ -9,8 +9,8 @@ import java.net.URI;
 public class Redis extends Jedis {
 	
 	private PApplet parent;
-	public final static String WRAPPER_VERSION = "1.1.1";
-	public final static String JEDIS_VERSION = "2.6.0";
+	public final static String WRAPPER_VERSION = "1.1.2";
+	public final static String JEDIS_VERSION = "3.0.0";
 	public final static String REDIS_VERSION = "2.8.5";
 	
 	public Redis(PApplet parent, String host) {
@@ -40,7 +40,7 @@ public class Redis extends Jedis {
 	
 	private void init(PApplet parent) {
 		this.parent = parent;
-		PApplet.println("# Redis-Wrapper v"+Redis.WRAPPER_VERSION+" - https://github.com/voidplus/redis-processing");
+		PApplet.println("# Redis-Wrapper v"+Redis.WRAPPER_VERSION+" - https://github.com/nok/redis-processing");
 		PApplet.println("# Jedis-Library v"+Redis.JEDIS_VERSION+" with Redis v"+Redis.REDIS_VERSION+" support - https://github.com/xetorthio/jedis");
 		this.parent.registerMethod("dispose", this);
 		

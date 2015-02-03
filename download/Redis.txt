@@ -5,10 +5,10 @@
 name = Redis
 
 # List of authors. Links can be provided using the syntax [author name](url).
-authorList = [Darius Morawiec](http://voidplus.de)
+authorList = [Darius Morawiec](http://nok.onl)
 
 # A web page for your library, NOT a direct link to where to download it.
-url = https://github.com/voidplus/redis-processing
+url = https://github.com/nok/redis-processing
 
 # The category of your library, must be one (or many) of the following:
 #   "3D"            "Animation"     "Compilations"      "Data"          
@@ -42,8 +42,8 @@ paragraph =
 # compare different versions of the same library, and check if an update is 
 # available. You should think of it as a counter, counting the total number of 
 # releases you've had.
-version = 4  # This must be parsable as an int
+version = 5  # This must be parsable as an int
 
 # The version as the user will see it. If blank, the version attribute will be 
 # used here.
-prettyVersion = 1.1.1  # This is treated as a String
+prettyVersion = 1.1.2  # This is treated as a String
