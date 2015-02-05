@@ -9,7 +9,7 @@ import java.net.URI;
 public class Redis extends Jedis {
 	
 	private PApplet parent;
-	public final static String WRAPPER_VERSION = "1.1.2";
+	public final static String WRAPPER_VERSION = "1.1.3";
 	public final static String JEDIS_VERSION = "3.0.0";
 	public final static String REDIS_VERSION = "2.8.5";
 	
